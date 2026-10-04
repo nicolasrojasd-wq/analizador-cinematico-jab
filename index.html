@@ -1,0 +1,420 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <meta
+    name="description"
+    content="Analizador Cinemático del JAB - análisis cinemático 2D de un golpe JAB mediante MediaPipe Pose Landmarker."
+  />
+  <title>Analizador Cinemático del JAB</title>
+
+  <link rel="stylesheet" href="style.css" />
+
+  <!-- Chart.js -->
+  <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+</head>
+
+<body>
+  <header class="hero">
+    <div class="hero__content">
+      <div class="hero__copy">
+        <span class="eyebrow">Análisis Bioinstrumental del Movimiento Humano</span>
+        <h1>Analizador Cinemático del JAB</h1>
+        <p class="hero__subtitle">
+          Análisis cinemático 2D del gesto mediante visión por computador.
+        </p>
+
+        <div class="hero__badges">
+          <span>MediaPipe Pose</span>
+          <span>Análisis 2D</span>
+          <span>HTML · CSS · JavaScript</span>
+        </div>
+      </div>
+
+      <div class="system-card">
+        <span class="system-card__label">Estado del sistema</span>
+        <div class="status-pill" id="systemStatus">
+          <span class="status-dot"></span>
+          <span>Inicializando MediaPipe...</span>
+        </div>
+      </div>
+    </div>
+  </header>
+
+  <main class="app-shell">
+    <!-- PASO 1 -->
+    <section class="card card--compact">
+      <div class="section-heading">
+        <div class="section-heading__title">
+          <span class="step-number">1</span>
+          <div>
+            <h2>Registro del movimiento</h2>
+            <p class="section-kicker">Selecciona la fuente de video</p>
+          </div>
+        </div>
+        <p>
+          Para el análisis final se recomienda utilizar un video corto con un solo JAB,
+          buena iluminación y el brazo completamente visible.
+        </p>
+      </div>
+
+      <div class="upload-grid">
+        <label class="upload-box" for="videoFile">
+          <span class="upload-icon">🎥</span>
+          <strong>Cargar video</strong>
+          <span>MP4, MOV o WebM compatible con el navegador</span>
+          <input id="videoFile" type="file" accept="video/*" hidden />
+        </label>
+
+        <button class="secondary-button" id="cameraButton" type="button">
+          <span class="button-icon">📷</span>
+          <span>
+            <strong>Usar cámara</strong>
+            <small>Visualización en vivo</small>
+          </span>
+        </button>
+      </div>
+
+      <div class="file-info" id="fileInfo">
+        <span class="file-info__dot"></span>
+        <span>No hay video cargado.</span>
+      </div>
+    </section>
+
+    <!-- PASO 2 -->
+    <section class="card card--compact">
+      <div class="section-heading">
+        <div class="section-heading__title">
+          <span class="step-number">2</span>
+          <div>
+            <h2>Configuración del análisis</h2>
+            <p class="section-kicker">Define el lado corporal y la calidad mínima de detección</p>
+          </div>
+        </div>
+      </div>
+
+      <div class="controls-panel">
+        <div class="control-group">
+          <label for="armSelect">Brazo que ejecuta el JAB</label>
+          <select id="armSelect">
+            <option value="right">Derecho</option>
+            <option value="left">Izquierdo</option>
+          </select>
+          <small>Selecciona el lado anatómico de la persona.</small>
+        </div>
+
+        <div class="control-group">
+          <label for="visibilityThreshold">Visibilidad mínima de landmarks</label>
+          <select id="visibilityThreshold">
+            <option value="0.4">0,40</option>
+            <option value="0.5" selected>0,50</option>
+            <option value="0.6">0,60</option>
+            <option value="0.7">0,70</option>
+          </select>
+          <small>Mayor valor = criterio más estricto.</small>
+        </div>
+
+        <div class="action-group">
+          <button class="primary-button" id="analyzeButton" type="button" disabled>
+            <span>▶</span>
+            Analizar JAB
+          </button>
+
+          <button class="ghost-button" id="resetButton" type="button">
+            Reiniciar
+          </button>
+        </div>
+      </div>
+
+      <div class="progress-wrap" id="progressWrap" hidden>
+        <div class="progress-label">
+          <span>Procesando video cuadro por cuadro</span>
+          <strong id="progressText">0%</strong>
+        </div>
+        <div class="progress-track">
+          <div class="progress-bar" id="progressBar"></div>
+        </div>
+      </div>
+    </section>
+
+    <!-- PASO 3 -->
+    <section class="card visualization-card">
+      <div class="section-heading">
+        <div class="section-heading__title">
+          <span class="step-number">3</span>
+          <div>
+            <h2>Visualización biomecánica</h2>
+            <p class="section-kicker">Landmarks y variables sincronizadas con el video</p>
+          </div>
+        </div>
+
+        <div class="legend-inline">
+          <span><i class="legend-dot legend-dot--joint"></i> Articulaciones</span>
+          <span><i class="legend-line"></i> Segmentos</span>
+          <span><i class="legend-line legend-line--trajectory"></i> Trayectoria</span>
+        </div>
+      </div>
+
+      <div class="video-stage" id="videoStage">
+        <div class="media-layer" id="mediaLayer">
+
+          <div class="video-surface" id="videoSurface">
+            <video
+              id="videoElement"
+              controls
+              playsinline
+              preload="metadata"
+            ></video>
+
+            <canvas id="overlayCanvas"></canvas>
+
+            <div class="overlay-hud" id="overlayHud" hidden>
+              <div class="hud-item hud-item--phase">
+                <span>Fase</span>
+                <strong id="overlayPhase">Sin datos</strong>
+              </div>
+
+              <div class="hud-item">
+                <span>Ángulo del codo</span>
+                <strong id="overlayAngle">--°</strong>
+              </div>
+
+              <div class="hud-item">
+                <span>Tiempo</span>
+                <strong id="overlayTime">0.00 s</strong>
+              </div>
+            </div>
+          </div>
+
+          <div class="empty-state" id="videoPlaceholder">
+            <div class="empty-state__icon">🎬</div>
+            <strong>Carga un video para comenzar</strong>
+            <small>
+              Mantén hombro, codo y muñeca visibles durante todo el registro.
+            </small>
+          </div>
+        </div>
+      </div>
+
+      <div class="visualization-note" id="visualizationNote">
+        Después del análisis puedes reproducir, pausar o mover la barra del video.
+        La superposición se actualizará automáticamente.
+      </div>
+
+      <div class="live-readout">
+        <article>
+          <span>Tiempo actual</span>
+          <strong id="liveTime">0.00 s</strong>
+        </article>
+
+        <article>
+          <span>Ángulo actual</span>
+          <strong id="liveAngle">--°</strong>
+        </article>
+
+        <article>
+          <span>Fase estimada</span>
+          <strong id="liveDetectionStatus">Sin datos</strong>
+        </article>
+      </div>
+    </section>
+
+    <!-- PASO 4 -->
+    <section class="card">
+      <div class="section-heading">
+        <div class="section-heading__title">
+          <span class="step-number">4</span>
+          <div>
+            <h2>Resultados del JAB</h2>
+            <p class="section-kicker">Resumen de las variables cinemáticas principales</p>
+          </div>
+        </div>
+      </div>
+
+      <div class="metrics-grid">
+        <article class="metric-card metric-card--featured">
+          <div class="metric-card__top">
+            <span>Ángulo inicial</span>
+            <span class="metric-unit">°</span>
+          </div>
+          <strong id="metricInitialAngle">--°</strong>
+          <small>Inicio estimado de la extensión</small>
+        </article>
+
+        <article class="metric-card metric-card--featured">
+          <div class="metric-card__top">
+            <span>Máxima extensión</span>
+            <span class="metric-unit">°</span>
+          </div>
+          <strong id="metricMaxAngle">--°</strong>
+          <small>Mayor ángulo detectado</small>
+        </article>
+
+        <article class="metric-card metric-card--featured">
+          <div class="metric-card__top">
+            <span>Rango angular</span>
+            <span class="metric-unit">°</span>
+          </div>
+          <strong id="metricRange">--°</strong>
+          <small>Cambio angular durante la extensión</small>
+        </article>
+
+        <article class="metric-card">
+          <div class="metric-card__top">
+            <span>Tiempo hasta máxima extensión</span>
+            <span class="metric-unit">s</span>
+          </div>
+          <strong id="metricDuration">-- s</strong>
+          <small>Duración de la fase analizada</small>
+        </article>
+
+        <article class="metric-card">
+          <div class="metric-card__top">
+            <span>Velocidad angular máxima</span>
+            <span class="metric-unit">°/s</span>
+          </div>
+          <strong id="metricMaxAngularVelocity">-- °/s</strong>
+          <small>Estimación por diferencias entre muestras</small>
+        </article>
+
+        <article class="metric-card metric-card--featured">
+          <div class="metric-card__top">
+            <span>Velocidad media de extensión</span>
+            <span class="metric-unit">°/s</span>
+          </div>
+          <strong id="metricMeanJabVelocity">-- °/s</strong>
+          <small>Desde el inicio del JAB hasta la máxima extensión del codo</small>
+        </article>
+
+        <article class="metric-card">
+          <div class="metric-card__top">
+            <span>Tiempo de retorno a guardia</span>
+            <span class="metric-unit">s</span>
+          </div>
+          <strong id="metricReturnTime">-- s</strong>
+          <small>Desde máxima extensión hasta recuperar aproximadamente la posición inicial</small>
+        </article>
+
+        <article class="metric-card">
+          <div class="metric-card__top">
+            <span>Cuadros válidos</span>
+            <span class="metric-unit">n</span>
+          </div>
+          <strong id="metricValidFrames">--</strong>
+          <small>Landmarks que superaron el criterio de visibilidad</small>
+        </article>
+      </div>
+
+      <div class="interpretation-box">
+        <div class="interpretation-box__icon">🥊</div>
+        <div>
+          <h3>Lectura específica del JAB</h3>
+          <p>
+            Además de la extensión, la interfaz analiza el retorno del brazo hacia la guardia.
+            Esta variable describe el ciclo del gesto sin clasificar la ejecución como correcta o incorrecta.
+          </p>
+        </div>
+      </div>
+
+      <div class="interpretation-box">
+        <div class="interpretation-box__icon">i</div>
+        <div>
+          <h3>Interpretación descriptiva</h3>
+          <p id="interpretationText">
+            Realiza un análisis para obtener una descripción del movimiento.
+          </p>
+        </div>
+      </div>
+    </section>
+
+    <!-- PASO 5 -->
+    <section class="card">
+      <div class="section-heading">
+        <div class="section-heading__title">
+          <span class="step-number">5</span>
+          <div>
+            <h2>Gráfico principal</h2>
+            <p class="section-kicker">Comportamiento del ángulo del codo en el tiempo</p>
+          </div>
+        </div>
+      </div>
+
+      <div class="chart-panel">
+        <div class="chart-panel__header">
+          <div>
+            <h3>Ángulo del codo vs. tiempo</h3>
+            <p>Serie temporal obtenida durante el procesamiento del video.</p>
+          </div>
+          <span class="chart-chip">Unidad: grados (°)</span>
+        </div>
+
+        <div class="chart-container">
+          <canvas id="angleChart"></canvas>
+        </div>
+      </div>
+    </section>
+
+    <!-- PASO 6 -->
+    <section class="card info-card">
+      <div class="section-heading">
+        <div class="section-heading__title">
+          <span class="step-number">6</span>
+          <div>
+            <h2>Información del método</h2>
+            <p class="section-kicker">Cómo se obtienen e interpretan las variables</p>
+          </div>
+        </div>
+      </div>
+
+      <div class="info-grid">
+        <article class="info-item">
+          <div class="info-item__icon">01</div>
+          <div>
+            <h3>Landmarks utilizados</h3>
+            <p>
+              MediaPipe detecta la pose corporal y la aplicación utiliza
+              hombro, codo y muñeca del brazo seleccionado.
+            </p>
+          </div>
+        </article>
+
+        <article class="info-item">
+          <div class="info-item__icon">02</div>
+          <div>
+            <h3>Cálculo angular</h3>
+            <p>
+              El codo funciona como vértice entre dos vectores:
+              hombro–codo y muñeca–codo.
+            </p>
+          </div>
+        </article>
+
+        <article class="info-item">
+          <div class="info-item__icon">03</div>
+          <div>
+            <h3>Limitaciones</h3>
+            <p>
+              El análisis es principalmente 2D y depende de la perspectiva,
+              iluminación, visibilidad articular, FPS y calidad del video.
+            </p>
+          </div>
+        </article>
+      </div>
+
+      <div class="method-warning">
+        <strong>Importante:</strong>
+        esta herramienta describe variables cinemáticas del registro y no establece
+        diagnóstico ni determina si la técnica es correcta o incorrecta.
+      </div>
+    </section>
+  </main>
+
+  <footer class="footer">
+    <strong>Analizador Cinemático del JAB</strong>
+    <span>Proyecto académico · Kinesiología · Análisis Bioinstrumental del Movimiento Humano</span>
+  </footer>
+
+  <script type="module" src="script.js"></script>
+</body>
+</html>
