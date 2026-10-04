@@ -1,4 +1,4 @@
-[README_definitivo_analizador_jab.md](https://github.com/user-attachments/files/33016543/README_definitivo_analizador_jab.md)
+
 # Analizador Cinemático del JAB
 
 Aplicación web desarrollada para la asignatura **Análisis Bioinstrumental del Movimiento Humano** de Kinesiología.
